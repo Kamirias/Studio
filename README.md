@@ -1,12 +1,13 @@
 # Studio
 
 AssetStudio for a certain honse game after the breaking update, made by yoinking code
+
 Check out the [original AssetStudio project](https://github.com/Perfare/AssetStudio) for more information.
 
 _____________________________________________________________________________________________________________________________
 How to use:
-Select the game: Options -> Specify Game
-Load the meta file: Misc -> Load Meta file ( will load automatically next time)
+- Select the game: Options -> Specify Game
+- Load the meta file: Misc -> Load Meta file ( will load automatically next time)
 
 You can load your bundle now
 _____________________________________________________________________________________________________________________________
