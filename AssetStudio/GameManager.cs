@@ -13,6 +13,7 @@ namespace AssetStudio
             int index = 0;
             Games.Add(index++, new(GameType.Normal));
             Games.Add(index++, new(GameType.UnityCN));
+            Games.Add(index++, new(GameType.UmamusumeJP));
             Games.Add(index++, new Mhy(GameType.GI, GIMhyShiftRow, GIMhyKey, GIMhyMul, GIExpansionKey, GISBox, GIInitVector, GIInitSeed));
             Games.Add(index++, new Mr0k(GameType.GI_Pack, PackExpansionKey, blockKey: PackBlockKey));
             Games.Add(index++, new Mr0k(GameType.GI_CB1));
@@ -134,6 +135,7 @@ namespace AssetStudio
     {
         Normal,
         UnityCN,
+        UmamusumeJP,
         GI,
         GI_Pack,
         GI_CB1,

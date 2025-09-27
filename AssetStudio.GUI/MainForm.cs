@@ -90,6 +90,8 @@ namespace AssetStudio.GUI
             InitializeProgressBar();
             InitializeLogger();
             InitalizeOptions();
+            InjectUmaJPMetaMenu();
+            TryAutoLoadUmaMetaFromSettings();
             FMODinit();
         }
 
@@ -181,6 +183,118 @@ namespace AssetStudio.GUI
                 }
             }
         }
+
+        private void InjectUmaJPMetaMenu()
+        {
+            try
+            {
+                // Avoid duplicates if called more than once
+                foreach (ToolStripItem item in miscToolStripMenuItem.DropDownItems)
+                {
+                    if (item.Name == "loadMetaFileUmaJpToolStripMenuItem")
+                    {
+                        return;
+                    }
+                }
+
+                var sep = new ToolStripSeparator { Name = "umaJpSep" };
+                var loadMetaItem = new ToolStripMenuItem("Load Meta file")
+                {
+                    Name = "loadMetaFileUmaJpToolStripMenuItem",
+                    ToolTipText = "UmamusumeJP: select encrypted 'meta' database to populate bundle keys"
+                };
+                loadMetaItem.Click += LoadMetaFileUmaJp_Click;
+
+                miscToolStripMenuItem.DropDownItems.Add(sep);
+                miscToolStripMenuItem.DropDownItems.Add(loadMetaItem);
+            }
+            catch
+            {
+                // best-effort; don't crash UI if menu not ready yet
+            }
+        }
+
+        private void LoadMetaFileUmaJp_Click(object sender, EventArgs e)
+        {
+            if (Studio.Game.Type != AssetStudio.GameType.UmamusumeJP)
+            {
+                MessageBox.Show(this, "This action is only applicable when Game is set to UmamusumeJP.", "UmamusumeJP", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var dbKeyHex = AssetStudio.UmaJPManager.GetDbKeyHex();
+            if (string.IsNullOrEmpty(dbKeyHex))
+            {
+                MessageBox.Show(this, "Built-in UmamusumeJP database key is unavailable. Please rebuild AssetStudio with valid keys.", "UmamusumeJP", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            using (var ofd = new OpenFileDialog())
+            {
+                ofd.Title = "Select UmamusumeJP encrypted meta database";
+                ofd.Filter = "All files|*.*";
+                ofd.CheckFileExists = true;
+                ofd.Multiselect = false;
+                if (ofd.ShowDialog(this) == DialogResult.OK)
+                {
+                    try
+                    {
+                        AssetStudio.UmaJPDbReader.LoadMetaAndPopulate(ofd.FileName, dbKeyHex);
+                        Properties.Settings.Default.umaJpMetaPath = ofd.FileName;
+                        Properties.Settings.Default.Save();
+                        MessageBox.Show(this, "Meta loaded and bundle keys populated.", "UmamusumeJP", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(this, $"Failed to load meta: {ex.Message}", "UmamusumeJP", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+        }
+
+        private void TryAutoLoadUmaMetaFromSettings()
+        {
+            if (Studio.Game.Type != AssetStudio.GameType.UmamusumeJP)
+            {
+                return;
+            }
+
+            if (AssetStudio.UmaJPManager.HasAnyBundleKeys())
+            {
+                return;
+            }
+
+            var storedPath = Properties.Settings.Default.umaJpMetaPath;
+            if (string.IsNullOrWhiteSpace(storedPath))
+            {
+                return;
+            }
+
+            if (!File.Exists(storedPath))
+            {
+                Logger.Warning($"Stored UmamusumeJP meta path '{storedPath}' was not found. Clearing saved reference.");
+                Properties.Settings.Default.umaJpMetaPath = string.Empty;
+                Properties.Settings.Default.Save();
+                return;
+            }
+
+            var dbKeyHex = AssetStudio.UmaJPManager.GetDbKeyHex();
+            if (string.IsNullOrEmpty(dbKeyHex))
+            {
+                Logger.Warning("Remembered UmamusumeJP meta path is available but database key is missing. Skipping auto-load.");
+                return;
+            }
+
+            try
+            {
+                AssetStudio.UmaJPDbReader.LoadMetaAndPopulate(storedPath, dbKeyHex);
+                Logger.Info($"Automatically loaded UmamusumeJP meta from '{storedPath}'.");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"Failed to auto-load UmamusumeJP meta from '{storedPath}': {ex.Message}");
+            }
+        }
         private void MainForm_DragEnter(object sender, DragEventArgs e)
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
@@ -203,6 +317,20 @@ namespace AssetStudio.GUI
             ResetForm();
             assetsManager.SpecifyUnityVersion = specifyUnityVersion.Text;
             assetsManager.Game = Studio.Game;
+            // Attempt auto-load of meta if missing, then fail fast if still missing
+            if (Studio.Game.Type == AssetStudio.GameType.UmamusumeJP)
+            {
+                if (!AssetStudio.UmaJPManager.HasABKey())
+                {
+                    MessageBox.Show(this, "Built-in UmamusumeJP bundle key is unavailable. Please rebuild AssetStudio with valid keys.", "UmamusumeJP", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                if (!AssetStudio.UmaJPManager.HasAnyBundleKeys())
+                {
+                    MessageBox.Show(this, "No bundle keys loaded. Use Misc > Load Meta file to decrypt and load keys from 'meta'.", "UmamusumeJP", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+            }
             if (paths.Length == 1 && Directory.Exists(paths[0]))
             {
                 await Task.Run(() => assetsManager.LoadFolder(paths[0]));
@@ -2145,6 +2273,11 @@ namespace AssetStudio.GUI
 
             assetsManager.SpecifyUnityVersion = specifyUnityVersion.Text;
             assetsManager.Game = Studio.Game;
+
+            if (Studio.Game.Type == AssetStudio.GameType.UmamusumeJP)
+            {
+                TryAutoLoadUmaMetaFromSettings();
+            }
         }
 
         private async void specifyNameComboBox_SelectedIndexChanged(object sender, EventArgs e)

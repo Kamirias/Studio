@@ -1,14 +1,14 @@
 # Studio
 
-# NOTICE: Project has been temporarily suspended till further notice.
-
+AssetStudio for a certain honse game after the breaking update, made by yoinking code
 Check out the [original AssetStudio project](https://github.com/Perfare/AssetStudio) for more information.
 
-Note: Requires Internet connection to fetch asset_index jsons.
 _____________________________________________________________________________________________________________________________
 How to use:
+Select the game: Options -> Specify Game
+Load the meta file: Misc -> Load Meta file ( will load automatically next time)
 
-Check the tutorial [here](https://gist.github.com/Modder4869/0f5371f8879607eb95b8e63badca227e) (Thanks to Modder4869 for the tutorial)
+You can load your bundle now
 _____________________________________________________________________________________________________________________________
 CLI Version:
 ```
@@ -45,6 +45,7 @@ NOTES:
 ```
 _____________________________________________________________________________________________________________________________
 Special Thank to:
+- croakfang [UmaViewer](https://github.com/croakfang/UmaViewer) for the decryption method
 - Perfare: Original author.
 - Khang06: [Project](https://github.com/khang06/genshinblkstuff) for extraction.
 - Radioegor146: [Asset-indexes](https://github.com/radioegor146/gi-asset-indexes) for recovered/updated asset_index's.

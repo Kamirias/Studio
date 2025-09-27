@@ -13,12 +13,17 @@
 	<PackageReference Include="MessagePack" Version="2.6.100-alpha" />
 	<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
 	<PackageReference Include="ZstdSharp.Port" Version="0.7.2" />
+  <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3mc" Version="2.1.8" />
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="8.0.9" />
   </ItemGroup>
 
   <ItemGroup>
   	<None Update="Keys.json">
   		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
   	</None>
+    <None Update="Config.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 	
 </Project>

@@ -168,6 +168,9 @@ namespace AssetStudio
                 Logger.Verbose("File is encrypted !!");
                 switch (game.Type)
                 {
+                    case GameType.UmamusumeJP:
+                        reader = DecryptUmamusumeJP(reader);
+                        break;
                     case GameType.GI_Pack:
                         reader = DecryptPack(reader, game);
                         break;
@@ -251,6 +254,33 @@ namespace AssetStudio
             }
 
             Logger.Verbose("No preprocessing is needed");
+            return reader;
+        }
+
+        private static FileReader DecryptUmamusumeJP(FileReader reader)
+        {
+            try
+            {
+                if (reader.FileType != FileType.BundleFile)
+                {
+                    return reader;
+                }
+
+                if (UmaJPManager.TryGetXorPadFor(reader.FileName, out var pad) || UmaJPManager.TryGetXorPadFor(reader.FullPath, out pad))
+                {
+                    Logger.Verbose($"[UmaJP] Applying XOR stream to {reader.FileName} with pad length {pad.Length} from offset 256");
+                    var xorStream = new XORAfterOffsetStream(reader.BaseStream, 256, pad);
+                    return new FileReader(reader.FullPath, xorStream, leaveOpen: false);
+                }
+                else
+                {
+                    Logger.Verbose($"[UmaJP] No per-bundle key found for {reader.FileName}, loading as-is");
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error($"[UmaJP] Failed to apply XOR decrypt for {reader.FileName}", e);
+            }
             return reader;
         }
     } 

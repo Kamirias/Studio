@@ -7,8 +7,6 @@ namespace AssetStudio
         private readonly byte[] _xorpad;
         private readonly long _offset;
 
-        private long Index => AbsolutePosition - _offset;
-
         public XORStream(Stream stream, long offset, byte[] xorpad) : base(stream, offset)
         {
             _xorpad = xorpad;
@@ -17,13 +15,20 @@ namespace AssetStudio
 
         public override int Read(byte[] buffer, int offset, int count)
         {
-            var pos = Index;
+            var startPos = AbsolutePosition;
             var read = base.Read(buffer, offset, count);
-            if (pos >= 0)
+            if (read <= 0)
             {
-                for (int i = offset; i < count; i++)
+                return read;
+            }
+
+            for (int i = 0; i < read; i++)
+            {
+                var absPos = startPos + i;
+                if (absPos >= _offset)
                 {
-                    buffer[i] ^= _xorpad[pos++ % _xorpad.Length];
+                    var keyIndex = (int)(absPos % _xorpad.Length);
+                    buffer[offset + i] ^= _xorpad[keyIndex];
                 }
             }
             return read;
