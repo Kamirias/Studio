@@ -188,29 +188,62 @@ namespace AssetStudio.GUI
         {
             try
             {
-                // Avoid duplicates if called more than once
+                var legacyExportItem = miscToolStripMenuItem.DropDownItems["exportDecryptedBundleUmaJpToolStripMenuItem"];
+                if (legacyExportItem != null)
+                {
+                    miscToolStripMenuItem.DropDownItems.Remove(legacyExportItem);
+                }
+
+                bool hasLoadMeta = false;
                 foreach (ToolStripItem item in miscToolStripMenuItem.DropDownItems)
                 {
                     if (item.Name == "loadMetaFileUmaJpToolStripMenuItem")
                     {
-                        return;
+                        hasLoadMeta = true;
+                        break;
                     }
                 }
 
-                var sep = new ToolStripSeparator { Name = "umaJpSep" };
-                var loadMetaItem = new ToolStripMenuItem("Load Meta file")
+                int sepIndex = miscToolStripMenuItem.DropDownItems.IndexOfKey("umaJpSep");
+                if (sepIndex < 0)
                 {
-                    Name = "loadMetaFileUmaJpToolStripMenuItem",
-                    ToolTipText = "UmamusumeJP: select encrypted 'meta' database to populate bundle keys"
-                };
-                loadMetaItem.Click += LoadMetaFileUmaJp_Click;
+                    miscToolStripMenuItem.DropDownItems.Add(new ToolStripSeparator { Name = "umaJpSep" });
+                    sepIndex = miscToolStripMenuItem.DropDownItems.Count - 1;
+                }
 
-                miscToolStripMenuItem.DropDownItems.Add(sep);
-                miscToolStripMenuItem.DropDownItems.Add(loadMetaItem);
+                if (!hasLoadMeta)
+                {
+                    var loadMetaItem = new ToolStripMenuItem("Load Meta file")
+                    {
+                        Name = "loadMetaFileUmaJpToolStripMenuItem",
+                        ToolTipText = "UmamusumeJP: select encrypted 'meta' database to populate bundle keys"
+                    };
+                    loadMetaItem.Click += LoadMetaFileUmaJp_Click;
+                    miscToolStripMenuItem.DropDownItems.Insert(sepIndex + 1, loadMetaItem);
+                }
+
+                if (exportToolStripMenuItem.DropDownItems.IndexOfKey("exportDecryptedBundleUmaJpToolStripMenuItem") < 0)
+                {
+                    var exportBundleItem = new ToolStripMenuItem("Export decrypted bundles")
+                    {
+                        Name = "exportDecryptedBundleUmaJpToolStripMenuItem",
+                        ToolTipText = "Decrypt and export the currently loaded UmamusumeJP bundles"
+                    };
+                    exportBundleItem.Click += ExportDecryptedBundleUmaJp_Click;
+
+                    var exportInsertIndex = exportToolStripMenuItem.DropDownItems.IndexOfKey("toolStripSeparator3");
+                    if (exportInsertIndex < 0)
+                    {
+                        exportToolStripMenuItem.DropDownItems.Add(exportBundleItem);
+                    }
+                    else
+                    {
+                        exportToolStripMenuItem.DropDownItems.Insert(exportInsertIndex, exportBundleItem);
+                    }
+                }
             }
             catch
             {
-                // best-effort; don't crash UI if menu not ready yet
             }
         }
 
@@ -249,6 +282,147 @@ namespace AssetStudio.GUI
                         MessageBox.Show(this, $"Failed to load meta: {ex.Message}", "UmamusumeJP", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
+            }
+        }
+
+        private void ExportDecryptedBundleUmaJp_Click(object sender, EventArgs e)
+        {
+            if (Studio.Game.Type != AssetStudio.GameType.UmamusumeJP)
+            {
+                MessageBox.Show(this, "This action is only applicable when Game is set to UmamusumeJP.", "UmamusumeJP", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            if (!AssetStudio.UmaJPManager.HasABKey())
+            {
+                MessageBox.Show(this, "Built-in UmamusumeJP bundle key is unavailable. Please rebuild AssetStudio with valid keys.", "UmamusumeJP", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (!AssetStudio.UmaJPManager.HasAnyBundleKeys())
+            {
+                MessageBox.Show(this, "No bundle keys loaded. Load the 'meta' database first.", "UmamusumeJP", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var bundlePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var missingSources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var serializedFile in Studio.assetsManager.assetsFileList)
+            {
+                var originalPath = serializedFile.originalPath;
+                if (string.IsNullOrEmpty(originalPath))
+                {
+                    continue;
+                }
+
+                if (File.Exists(originalPath))
+                {
+                    bundlePaths.Add(originalPath);
+                }
+                else
+                {
+                    missingSources.Add(originalPath);
+                }
+            }
+
+            if (bundlePaths.Count == 0)
+            {
+                var message = "No UmamusumeJP bundles from the current session were detected for export.";
+                if (missingSources.Count > 0)
+                {
+                    message += Environment.NewLine + Environment.NewLine + "Missing files:" + Environment.NewLine + string.Join(Environment.NewLine, missingSources.Select(Path.GetFileName));
+                }
+                MessageBox.Show(this, message, "UmamusumeJP", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var firstExistingPath = bundlePaths.FirstOrDefault();
+            var folderDialog = new OpenFolderDialog
+            {
+                Title = "Select output folder for decrypted bundles",
+                InitialFolder = !string.IsNullOrEmpty(firstExistingPath) ? Path.GetDirectoryName(firstExistingPath) : null
+            };
+
+            if (folderDialog.ShowDialog(this) != DialogResult.OK || string.IsNullOrEmpty(folderDialog.Folder))
+            {
+                return;
+            }
+
+            int success = 0;
+            var keyFailures = new List<string>();
+            var exportFailures = new List<string>();
+            foreach (var srcPath in bundlePaths)
+            {
+                try
+                {
+                    if (!AssetStudio.UmaJPManager.TryGetXorPadFor(srcPath, out var pad) && !AssetStudio.UmaJPManager.TryGetXorPadFor(Path.GetFileName(srcPath), out pad))
+                    {
+                        keyFailures.Add(Path.GetFileName(srcPath));
+                        continue;
+                    }
+
+                    var outputName = Path.GetFileName(srcPath);
+                    var destPath = Path.Combine(folderDialog.Folder, outputName);
+                    ExportUmaBundleToFile(srcPath, destPath, pad);
+                    Logger.Info($"[UmaJP] Exported decrypted bundle to '{destPath}'");
+                    success++;
+                }
+                catch (Exception ex)
+                {
+                    exportFailures.Add($"{Path.GetFileName(srcPath)} ({ex.Message})");
+                    Logger.Warning($"[UmaJP] Failed to export decrypted bundle for '{srcPath}': {ex}");
+                }
+            }
+
+            var summary = $"Finished exporting {success} bundle(s) to '{folderDialog.Folder}'.";
+            if (missingSources.Count > 0)
+            {
+                summary += Environment.NewLine + Environment.NewLine + "Missing source files:" + Environment.NewLine + string.Join(Environment.NewLine, missingSources.Select(Path.GetFileName));
+            }
+            if (keyFailures.Count > 0)
+            {
+                summary += Environment.NewLine + Environment.NewLine + "Bundles without a resolved key:" + Environment.NewLine + string.Join(Environment.NewLine, keyFailures);
+            }
+            if (exportFailures.Count > 0)
+            {
+                summary += Environment.NewLine + Environment.NewLine + "Failed during export:" + Environment.NewLine + string.Join(Environment.NewLine, exportFailures);
+                MessageBox.Show(this, summary, "UmamusumeJP", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            else
+            {
+                MessageBox.Show(this, summary, "UmamusumeJP", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private static void ExportUmaBundleToFile(string srcPath, string destPath, byte[] pad)
+        {
+            const long xorOffset = 256;
+            const int bufferSize = 128 * 1024;
+
+            var directory = Path.GetDirectoryName(destPath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            using var input = File.OpenRead(srcPath);
+            using var output = File.Create(destPath);
+            var buffer = new byte[bufferSize];
+            long position = 0;
+            int read;
+            while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                for (int i = 0; i < read; i++)
+                {
+                    var absPos = position + i;
+                    if (absPos >= xorOffset)
+                    {
+                        buffer[i] = (byte)(buffer[i] ^ pad[(int)(absPos % pad.Length)]);
+                    }
+                }
+                output.Write(buffer, 0, read);
+                position += read;
             }
         }
 
