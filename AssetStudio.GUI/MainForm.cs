@@ -85,7 +85,7 @@ namespace AssetStudio.GUI
         {
             Thread.CurrentThread.CurrentCulture = new CultureInfo("en-US");
             InitializeComponent();
-            Text = $"Studio v{Application.ProductVersion}";
+            Text = $"UmaStudio v{Application.ProductVersion}";
             InitializeExportOptions();
             InitializeProgressBar();
             InitializeLogger();
@@ -610,7 +610,7 @@ namespace AssetStudio.GUI
                 }
             }
 
-            Text = $"Studio v{Application.ProductVersion} - {productName} - {assetsManager.assetsFileList[0].unityVersion} - {assetsManager.assetsFileList[0].m_TargetPlatform}";
+            Text = $"UmaStudio v{Application.ProductVersion} - {productName} - {assetsManager.assetsFileList[0].unityVersion} - {assetsManager.assetsFileList[0].m_TargetPlatform}";
 
             assetListView.VirtualListSize = visibleAssets.Count;
 
@@ -1786,7 +1786,7 @@ namespace AssetStudio.GUI
 
         public void ResetForm()
         {
-            Text = $"Studio v{Application.ProductVersion}";
+            Text = $"UmaStudio v{Application.ProductVersion}";
             assetsManager.Clear();
             assemblyLoader.Clear();
             exportableAssets.Clear();
