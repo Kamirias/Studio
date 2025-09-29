@@ -1,4 +1,4 @@
-# Studio
+# UmaStudio
 
 AssetStudio for a certain honse game after the breaking update, made by yoinking code
 
@@ -10,6 +10,8 @@ How to use:
 - Load the meta file: Misc -> Load Meta file ( will load automatically next time)
 
 You can load your bundle now
+
+In case you want to encrypt the bundle back ( like after modding ): Misc -> Encrypt bundle file -> Select your decrypted bundle(s) 
 _____________________________________________________________________________________________________________________________
 CLI Version:
 ```
